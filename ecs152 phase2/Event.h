@@ -3,7 +3,7 @@
 //For types of events: Arrival, departue, backoff, and wait. For backoff the events are cleared when
 //the channel becomes busy and reentered when the channel is clear. When the events are cleared the
 //hosts should update their wait time
-enum EventType { ARRIVAL, DEPARTURE, BACKOFF, WAIT };
+enum EventType { ARRIVAL, DEPARTURE, BACKOFF, WAIT_DIFS, WAIT_SIFS };
 
 
 //Event class: Includes time of the event and type of the event and pointers to next and previous event

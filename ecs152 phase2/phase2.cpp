@@ -16,6 +16,7 @@ void srand48(long time){
 using namespace std;
 const double INTERARRIVALRATE = 0.90;
 const double TRANSMISSIONRATE = 1;
+const int NUMHOSTS = 10;
 
 //0 means psuedo infinite
 const int BUFFERSIZE = 0;
@@ -33,6 +34,21 @@ double negative_exponenetially_distributed_time(double rate)
 
 //-------------------------------------------------------------------------------
 
+void Initiliaze(GEL **gel, double* interArrivalRate, double* throuput, double* avgNetworkDelay, double* time)
+{
+	*interArrivalRate = INTERARRIVALRATE;
+	*throuput = 0;
+	*avgNetworkDelay = 0;
+	*time = 0;
+
+	Event* firsts[NUMHOSTS];
+	for (int i = 0; i < NUMHOSTS; i++){
+		firsts[i] = new Event(negative_exponenetially_distributed_time(*interArrivalRate), ARRIVAL, i, i);
+	}
+	*gel = new GEL(firsts[0]);
+	for (int i = 1; i < NUMHOSTS; i++)
+		(*gel)->insert(firsts[i]);
+}
 
 /*
 //Initialize data structures, and statistics. Creates first arrival event and inserts it into GEL
@@ -138,11 +154,15 @@ int main(int argc, char* argv[])
 
 	//The rate for the arrival of packets
 	double interArrivalRate;
-	//The rate for the transmission time of packets
-	double transmissionRate;
 
+	//True if channel is being used, false if channel is free
+	bool isUsed = false;
+	
 	GEL* eventList = nullptr;
-	Buffer* queue = nullptr;
+	Host* hosts[NUMHOSTS];
+	for (int i = 0; i < NUMHOSTS; i++)
+		hosts[i] = new Host(buffersize);
+
 	//Keeps track of the total time;
 	double simTime;
 

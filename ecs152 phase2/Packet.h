@@ -73,4 +73,23 @@ public:
 		return maxSize;
 	}
 };
+
+class Host : private Buffer{
+private:
+	double backoffTime;
+public:
+	Host() : Buffer(){
+		backoffTime = 0;
+	}
+	Host(int buffersize) : Buffer(buffersize){
+		backoffTime = 0;
+	}
+	double getBackoffTime(){
+		return backoffTime;
+	}
+	void setBackoffTime(double time){
+		backoffTime = time;
+	}
+
+};
 #endif
