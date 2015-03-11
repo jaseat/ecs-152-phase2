@@ -1,7 +1,9 @@
 #ifndef HEADER_H
 #define HEADER_H
-//Two types of events: arrival and departure
-enum EventType { ARRIVAL, DEPARTURE };
+//For types of events: Arrival, departue, backoff, and wait. For backoff the events are cleared when
+//the channel becomes busy and reentered when the channel is clear. When the events are cleared the
+//hosts should update their wait time
+enum EventType { ARRIVAL, DEPARTURE, BACKOFF, WAIT };
 
 
 //Event class: Includes time of the event and type of the event and pointers to next and previous event
@@ -12,13 +14,15 @@ private:
 	EventType type;
 	Event* next;
 	Event* previous;
+	int destination;
 public:
 	Event(){
 		//nothing
 	}
-	Event(double time, EventType type){
+	Event(double time, EventType type, int destination){
 		eventTime = time;
 		this->type = type;
+		this->destination = destination;
 		next = nullptr;
 		previous = nullptr;
 	}
@@ -27,6 +31,9 @@ public:
 	}
 	EventType getType(){
 		return type;
+	}
+	int getDestination(){
+		return destination;
 	}
 	void setNext(Event* next){
 		this->next = next;
@@ -95,6 +102,36 @@ public:
 
 	Event* first(){
 		return head;
+	}
+	void clearBackoff(){
+		if (head == nullptr)
+			return;
+		Event* e = head;
+		while (head->getType() == BACKOFF){
+			if (head->getNext() != nullptr){
+				head = e->getNext();
+				head->setPrevious(nullptr);
+				delete e;
+				e = head;
+			}
+		}
+		while (e->getNext() != nullptr)
+		{
+			if (e->getType() == BACKOFF){
+				Event* prev = e->getPrevious();
+				Event* next = e->getNext();
+				prev->setNext(next);
+				next->setPrevious(prev);
+				delete e;
+				e = next;
+
+			}
+		}
+		if (e->getType() == BACKOFF){
+			Event* prev = e->getPrevious();
+			prev->setNext(nullptr);
+			delete e;
+		}
 	}
 };
 #endif

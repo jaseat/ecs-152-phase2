@@ -6,12 +6,14 @@ const int MAXBUFFER = 100;
 class Packet{
 private:
 	double serviceTime;
+	int destination;
 public:
 	Packet(){
 		//nothing
 	}
-	Packet(double time){
+	Packet(double time, int destination){
 		serviceTime = time;
+		this->destination = destination;
 	}
 	double getServiceTime(){
 		return serviceTime;
@@ -35,7 +37,7 @@ public:
 	}
 	Buffer(int buffersize){
 		if (buffersize == 0){
-			maxSize = 1000000;
+			maxSize = 10000;
 		}
 		else{
 			maxSize = buffersize;
@@ -51,7 +53,6 @@ public:
 		buffer[length] = p;
 		length++;
 		return 0;
-
 	}
 	double remove(){
 		double pckt;

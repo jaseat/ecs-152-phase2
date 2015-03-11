@@ -14,9 +14,14 @@ void srand48(long time){
 #endif
 
 using namespace std;
-static double INTERARRIVALRATE = 0.90;
-static double TRANSMISSIONRATE = 1;
-static int BUFFERSIZE = 50;
+const double INTERARRIVALRATE = 0.90;
+const double TRANSMISSIONRATE = 1;
+
+//0 means psuedo infinite
+const int BUFFERSIZE = 0;
+
+//Multiplier for random back off
+const double randomBackOffMult = 1;
 
 
 double negative_exponenetially_distributed_time(double rate)
@@ -26,6 +31,10 @@ double negative_exponenetially_distributed_time(double rate)
 	return ((-1 / rate)*log(1-u));
 }
 
+//-------------------------------------------------------------------------------
+
+
+/*
 //Initialize data structures, and statistics. Creates first arrival event and inserts it into GEL
 void Initialize(GEL **gel, Buffer** queue, int buffersize, double* interArrivalRate, 
 	double* transmissionRate, double* utilization, double* meanQueueLength, int* packetsdropped, double* time)
@@ -43,6 +52,8 @@ void Initialize(GEL **gel, Buffer** queue, int buffersize, double* interArrivalR
 	*gel = new GEL(first);
 
 }
+
+//-------------------------------------------------------------------------------
 
 void arrivalEvent(GEL** gel, Buffer** queue, double arrivalRate, double serviceRate, 
 	double* utilization, double* meanQueueLength, int* packetDrop, double *time)
@@ -82,6 +93,8 @@ void arrivalEvent(GEL** gel, Buffer** queue, double arrivalRate, double serviceR
 	delete e;
 }
 
+//-------------------------------------------------------------------------------
+
 void departureEvent(GEL** gel, Buffer** queue, double arrivalRate, double serviceRate, 
 	double* utilization, double* meanQueueLength, double *time)
 {
@@ -108,17 +121,20 @@ void departureEvent(GEL** gel, Buffer** queue, double arrivalRate, double servic
 
 }
 
+//-------------------------------------------------------------------------------
+
+*/
+
 int main(int argc, char* argv[])
 {
 	int buffersize = BUFFERSIZE;
 	srand48(time(NULL));
 	drand48();
-	//Measures the total time of utilization. This is all time that length>0
-	double utilization;
-	//Measures the mean queue length. This is gained by summing the area under the length versus time graph and dividing by total time
-	double meanQueueLength;
-	//Measures the total number of packets dropped
-	int packetsDropped;
+
+	//Number of bytes successfully transferred divided by total time
+	double throughput;
+	//Total delay for all hosts divided by throughput
+	double avgNetworkDelay;
 
 	//The rate for the arrival of packets
 	double interArrivalRate;
