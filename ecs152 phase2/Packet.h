@@ -54,12 +54,12 @@ public:
 		length++;
 		return 0;
 	}
-	double remove(){
-		double pckt;
-		if (length > 1)
-			pckt = buffer[1].getServiceTime();
+	Packet remove(){
+		Packet pckt;
+		if (length < 0)
+			exit(1);
 		else
-			pckt = -1;
+			pckt = buffer[0];
 		for (int i = 0; i < length; i++){
 			buffer[i] = buffer[i + 1];
 		}

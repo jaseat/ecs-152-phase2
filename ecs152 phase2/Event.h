@@ -61,6 +61,7 @@ public:
 	GEL(Event* head){
 		this->head = head;
 	}
+	//inserts events by order of time
 	void insert(Event* e){
 		Event* cur = head;
 		if (head == nullptr)
@@ -103,6 +104,7 @@ public:
 	Event* first(){
 		return head;
 	}
+	//Removes all events of type Backoff from the event list
 	void clearBackoff(){
 		if (head == nullptr)
 			return;
