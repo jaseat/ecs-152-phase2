@@ -14,14 +14,16 @@ private:
 	EventType type;
 	Event* next;
 	Event* previous;
+	int source;
 	int destination;
 public:
 	Event(){
 		//nothing
 	}
-	Event(double time, EventType type, int destination){
+	Event(double time, EventType type, int source, int destination){
 		eventTime = time;
 		this->type = type;
+		this->source = source;
 		this->destination = destination;
 		next = nullptr;
 		previous = nullptr;
@@ -31,6 +33,9 @@ public:
 	}
 	EventType getType(){
 		return type;
+	}
+	int getSource(){
+		return source;
 	}
 	int getDestination(){
 		return destination;
