@@ -114,15 +114,15 @@ public:
 	}
 	//Removes all events from a certain host
 	void removeHost(int hostNum){
-		while (head->getSource() == hostNum){
+		while (head->getSource() == hostNum && (head->getType() == WAIT_DIFS || head->getType() == WAIT_SIFS)){
 			Event* h = head;
 			head = head->getNext();
 			head->setPrevious(nullptr);
 			delete h;
 		}
 		Event* cur = head;
-		while (cur->getNext != nullptr){
-			if (cur->getSource() == hostNum){
+		while (cur->getNext() != nullptr){
+			if (cur->getSource() == hostNum && (cur->getType() == WAIT_DIFS || cur->getType() == WAIT_SIFS)){
 				Event* e = cur;
 				Event* prev = cur->getPrevious();
 				Event* next = cur->getNext();
@@ -131,8 +131,10 @@ public:
 				cur = next;
 				delete e;
 			}
+			else
+				cur = cur->getNext();
 		}
-		if (cur->getSource == hostNum){
+		if (cur->getSource() == hostNum && (cur->getType() == WAIT_DIFS || cur->getType() == WAIT_SIFS)){
 			Event* prev = cur->getPrevious();
 			prev->setNext(nullptr);
 			delete cur;

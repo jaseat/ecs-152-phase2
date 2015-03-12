@@ -14,13 +14,13 @@ void srand48(long time){
 #endif
 
 using namespace std;
-const double INTERARRIVALRATE = 1000000;
+const double INTERARRIVALRATE = 1;
 const double TRANSMISSIONRATE = 1.0;
 const int NUMHOSTS = 10;
 const double MBPS = 11000000.0;
 const int MAXDATALENGTH = 1544;
 const int ACKLENGTH = 64;
-const double SENSE = 0.01;
+const double SENSE = 0.1;
 
 //0 means psuedo infinite
 const int BUFFERSIZE = 0;
@@ -41,6 +41,17 @@ double negative_exponenetially_distributed_time(double rate)
 
 //-------------------------------------------------------------------------------
 
+bool conflict(Host** hosts)
+{
+	int t = 0;
+	for (int i = 0; i < NUMHOSTS; i++){
+		if (hosts[i]->departing == true)
+			t++;
+	}
+
+	return t > 1;
+}
+
 void Initiliaze(GEL **gel, double* interArrivalRate, double* throughput, double* avgNetworkDelay, double* time)
 {
 	*interArrivalRate = INTERARRIVALRATE;
@@ -55,7 +66,7 @@ void Initiliaze(GEL **gel, double* interArrivalRate, double* throughput, double*
 	*gel = new GEL(firsts[0]);
 	for (int i = 1; i < NUMHOSTS; i++)
 		(*gel)->insert(firsts[i]);
-	Event* updateEvent = new Event(*time + SENSE, UPDATE, 0);
+	Event* updateEvent = new Event(*time + SENSE, UPDATE, NUMHOSTS+1);
 	(*gel)->insert(updateEvent);
 }
 
@@ -68,8 +79,7 @@ int generate_data_transmission_length()
 
 //-------------------------------------------------------------------------------
 
-
-void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool* sensed, double wait)
+void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time)
 {
 	int source;
 	int destination = (rand() % NUMHOSTS);
@@ -95,9 +105,9 @@ void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool*
 
 	if (host->getLength() == 1){
 		host->startDelay(*time);
-		if (*sensed) {
+		if (host->sensed) {
 			double backoff = drand48() * randomBackOffMult;
-			Event* backoffEvent = new Event(backoff + *time + wait, BACKOFF, source);
+			Event* backoffEvent = new Event(backoff + *time, BACKOFF, source);
 			(*gel)->insert(backoffEvent);
 		}
 		else{
@@ -111,113 +121,256 @@ void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool*
 
 //-------------------------------------------------------------------------------
 
-void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bool* isUsed, double wait, double* throughput)
+void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bool* isUsed, double* throughput, bool* confs)
 {
 	int source;
 	int destination;
 	double timeDiff = *time;
 
-	*isUsed = false;
+	bool conf = conflict(host);
 
 	Event* e = (*gel)->remove();
 	*time = e->getTime();
 	timeDiff = *time - timeDiff;
 	source = e->getSource();
 
-	Packet pckt = host[source]->remove();
+	host[source]->sent = true;
+	host[source]->recievedAck = false;
+	host[source]->waitAck = 100;
+	host[source]->departing = false;
+
+
+	if (conf || *confs){
+		if (!conf){
+			*confs = false;
+			*isUsed = false;
+		}
+		host[source]->fail = host[source]->fail + 1;
+		host[source]->wait = drand48() * randomBackOffMult * host[source]->fail;
+		return;
+	}
+	*confs = false;
+	*isUsed = false;
+
+	host[source]->fail = 1;
+
+	Packet pckt = host[source]->peek();
 
 	*throughput = *throughput + pckt.getLength();
 
-	if (!(pckt.isAck())){
-		host[source]->endDelay(*time);
-		destination = pckt.getDestination();
+	host[source]->endDelay(*time);
+	destination = pckt.getDestination();
 
-		Packet* nw = new Packet(ACKLENGTH, source, true);
-		host[destination]->insertAck(*nw);
-		//host[destination]->startDelay(*time);
-		delete nw;
+	Packet* nw = new Packet(ACKLENGTH, source, true);
+	host[destination]->insertAck(*nw);
 
+	if (host[destination]->getLength() > 0)
+		host[destination]->endDelay(*time);
+
+	
+	delete nw;
+
+	if (host[destination]->getAckLength() == 1){
+		host[destination]->startDelay(*time);
+		(*gel)->removeHost(destination);
 		Event* waitSIFSEvent = new Event(SIFS + *time, WAIT_SIFS, destination);
-
 		(*gel)->insert(waitSIFSEvent);
-		if (host[source]->getLength() > 0){
-			host[source]->startDelay(*time);
-			Event* waitDIFSEvent = new Event(DIFS + *time, WAIT_DIFS, source);
-			(*gel)->insert(waitDIFSEvent);
-		}
 	}
-	
 
-	
 
 	delete e;
 }
 
 //-------------------------------------------------------------------------------
 
-void waitEventDFIS(GEL** gel, Host** host, double *time, bool* isUsed, bool* sensed, double* wait){
-	int source;
-	int destination;
-	double timeDiff = *time;
-
-	Event* e = (*gel)->remove();
-	*time = e->getTime();
-	timeDiff = *time - timeDiff;
-	source = e->getSource();
-
-	if (*sensed){
-		int backoff = drand48() * randomBackOffMult * host[source]->getFail();
-		host[source]->wait = backoff;
-	}
-	else{
-		Packet pckt = host[source]->peek();
-		int length = pckt.getLength();
-		double serviceTime = (length * 8) / MBPS;
-		*wait = serviceTime;
-		*isUsed = true;
-		Event* departureEvent = new Event(serviceTime + *time, DEPARTURE, source);
-		(*gel)->insert(departureEvent);
-	}
-}
-
-//-------------------------------------------------------------------------------
-
-void waitEventSFIS(GEL** gel, Host** host, double *time, bool* isUsed, bool* sensed, double* wait){
-	int source;
-	int destination;
-	double timeDiff = *time;
-
-	Event* e = (*gel)->remove();
-	*time = e->getTime();
-	timeDiff = *time - timeDiff;
-	source = e->getSource();
-
-	if (*sensed){
-		int backoff = drand48() * randomBackOffMult * host[source]->getFail();
-		host[source]->wait = backoff;
-	}
-	else{
-		Packet pckt = host[source]->peek();
-		int length = pckt.getLength();
-		double serviceTime = (length * 8) / MBPS;
-		*wait = serviceTime;
-		*isUsed = true;
-		Event* departureEvent = new Event(serviceTime + *time, DEPARTURE, source);
-		(*gel)->insert(departureEvent);
-	}
-}
-
-//-------------------------------------------------------------------------------
-
-void updateEvent(GEL **gel, bool* isUsed, bool* sensed, double* time)
+void departureAckEvent(GEL** gel, Host** host, double arrivalRate, double *time, bool* isUsed, double* throughput, bool* confs)
 {
-	*sensed = *isUsed;
+	int source;
+	int destination;
+	double timeDiff = *time;
+
+	bool conf = conflict(host);
+
+	Event* e = (*gel)->remove();
+	*time = e->getTime();
+	timeDiff = *time - timeDiff;
+	source = e->getSource();
+
+	host[source]->sent = false;
+	host[source]->recievedAck = true;
+	host[source]->waitAck = 0;
+	host[source]->departing = false;
+
+
+	if (conf || *confs){
+		if (!conf){
+			*confs = false;
+			*isUsed = false;
+		}
+		host[source]->fail = host[source]->fail + 1;
+		host[source]->wait = drand48() * randomBackOffMult * host[source]->fail;
+		return;
+	}
+	*confs = false;
+	*isUsed = false;
+
+	host[source]->fail = 1;
+
+	Packet pckt = host[source]->removeAck();
+
+	*throughput = *throughput + pckt.getLength();
+
+	host[source]->endDelay(*time);
+	destination = pckt.getDestination();
+
+	host[destination]->recievedAck = true;
+
+
+	if (host[source]->getAckLength() > 0){
+			host[source]->startDelay(*time);
+			Event* waitSIFSEvent = new Event(SIFS + *time, WAIT_SIFS, source);
+			(*gel)->insert(waitSIFSEvent);
+	}
+	else if (host[source]->getLength() > 0){
+		host[source]->startDelay(*time);
+		Event* waitDIFSEvent = new Event(DIFS + *time, WAIT_DIFS, source);
+		(*gel)->insert(waitDIFSEvent);
+	}
+
+	delete e;
+}
+
+//-------------------------------------------------------------------------------
+
+void createDepartureEvent(GEL** gel, Host** host, double *time, bool* isUsed, bool* confs, int source)
+{
+	Packet pckt = host[source]->peek();
+	host[source]->sent = false;
+	int length = pckt.getLength();
+	double serviceTime = (length * 8) / MBPS;
+	*isUsed = true;
+	host[source]->departing = true;
+	host[source]->sensed = true;
+	*confs = conflict(host);
+	Event* departureEvent = new Event(serviceTime + *time, DEPARTURE, source);
+	(*gel)->insert(departureEvent);
+}
+
+//-------------------------------------------------------------------------------
+
+void waitEventDFIS(GEL** gel, Host** host, double *time, bool* isUsed, bool* confs){
+	int source;
+	int destination;
+	double timeDiff = *time;
+
+	Event* e = (*gel)->remove();
+	*time = e->getTime();
+	timeDiff = *time - timeDiff;
+	source = e->getSource();
+
+	if (host[source]->sensed){
+		int backoff = drand48() * randomBackOffMult * host[source]->fail;
+		host[source]->wait = backoff;
+	}
+	else{
+		createDepartureEvent(gel, host, time, isUsed, confs, source);
+	}
+
+	delete e;
+}
+
+//-------------------------------------------------------------------------------
+
+void waitEventSFIS(GEL** gel, Host** host, double *time, bool* isUsed, bool* confs){
+	int source;
+	int destination;
+	double timeDiff = *time;
+
+	Event* e = (*gel)->remove();
+	*time = e->getTime();
+	timeDiff = *time - timeDiff;
+	source = e->getSource();
+
+	if (host[source]->sensed){
+		int backoff = drand48() * randomBackOffMult * host[source]->fail;
+		host[source]->wait = backoff;
+	}
+	else{
+		Packet pckt = host[source]->peekAck();
+		host[source]->sent = false;
+		int length = pckt.getLength();
+		double serviceTime = (length * 8) / MBPS;
+		*isUsed = true;
+		host[source]->departing = true;
+		host[source]->sensed = true;
+		*confs = conflict(host);
+		Event* departureEvent = new Event(serviceTime + *time, DEPARTURE_ACK, source);
+		(*gel)->insert(departureEvent);
+	}
+
+	delete e;
+}
+
+//-------------------------------------------------------------------------------
+
+void updateEvent(GEL **gel, Host** hosts, bool* isUsed, double* time, bool* confs, bool* change)
+{
+	*change = false;
+	for (int i = 0; i < NUMHOSTS; i++){
+		hosts[i]->sensed = *isUsed;
+	}
 
 	Event* e = (*gel)->remove();
 	*time = e->getTime();
 
-	Event* updateEvent = new Event(*time + SENSE, UPDATE, 0);
+	Event* updateEvent = new Event(*time + SENSE, UPDATE, NUMHOSTS+1);
 	(*gel)->insert(updateEvent);
+	
+	if (!(*isUsed)){
+		for (int i = 0; i < NUMHOSTS; i++){
+			if (hosts[i]->wait > 1){
+				*change = true;
+				if (hosts[i]->wait == 1){
+					hosts[i]->wait = 0;
+					createDepartureEvent(gel, hosts, time, isUsed, confs, i);
+				}
+				else
+					hosts[i]->wait = hosts[i]->wait - 1;
+			}
+		}//for (int i = 0; i < NUMHOSTS; i++)
+	}
+
+	for (int i = 0; i < NUMHOSTS; i++){
+		if (hosts[i]->sent){
+			if (hosts[i]->recievedAck){
+				hosts[i]->remove();
+				hosts[i]->sent = false;
+				*change = true;
+				if (hosts[i]->getLength() > 0){
+					hosts[i]->startDelay(*time);
+					Event* waitDIFSEvent = new Event(DIFS + *time, WAIT_DIFS, i);
+					(*gel)->insert(waitDIFSEvent);
+					*change = true;
+				}
+			}//if (hosts[i]->recievedAck)
+			else if (hosts[i]->waitAck > 0){
+				*change = true;
+				hosts[i]->waitAck = hosts[i]->waitAck - 1;
+			}
+			else if (hosts[i]->waitAck == 0){
+				*change = true;
+				if (*isUsed){
+					int backoff = drand48() * randomBackOffMult * hosts[i]->fail;
+					hosts[i]->wait = backoff;
+				}
+				else{
+					createDepartureEvent(gel, hosts, time, isUsed, confs, i);
+				}
+			}
+		}//if (hosts[i]->sent)
+	}//for (int i = 0; i < NUMHOSTS; i++)
+
+	delete e;
 }
 
 
@@ -239,11 +392,9 @@ int main(int argc, char* argv[])
 
 	//True if channel is being used, false if channel is free
 	bool isUsed = false;
-	bool sensed = false;
 
-	//Wait is set whenever a data frame is being submitted. It is set to the total time needed for the frame to finish transmission.
-	//Since the backoff must stop counting when the channel is busy, the value of wait is added to the backoff time.
-	double wait = 0;
+	bool confs = false;
+	bool change = false;
 	
 	GEL* eventList = nullptr;
 	Host* hosts[NUMHOSTS];
@@ -257,30 +408,46 @@ int main(int argc, char* argv[])
 
 	for (int i = 0; i < 100000; i++)
 	{
+		/*for (int j = 0; j < NUMHOSTS; j++)
+			cout << "HOST " << j << ": " << hosts[j]->getLength() << endl;*/
 		Event* curEvent = eventList->first();
 		int source = curEvent->getSource();
-		
+		cout << "I: " << i << endl;
 		switch (curEvent->getType())
 		{
 		case ARRIVAL:
-			arrivalEvent(&eventList, hosts[source], interArrivalRate, &simTime, &sensed, wait);
+			change = true;
+			arrivalEvent(&eventList, hosts[source], interArrivalRate, &simTime);
 			break;
 		case DEPARTURE:
-			departureEvent(&eventList, hosts, interArrivalRate, &simTime, &isUsed, wait, &throughput);
+			change = true;
+			departureEvent(&eventList, hosts, interArrivalRate, &simTime, &isUsed, &throughput, &confs);
 			break;
 		case DEPARTURE_ACK:
-			departureAckEvent();
+			change = true;
+			departureAckEvent(&eventList, hosts, interArrivalRate, &simTime, &isUsed, &throughput, &confs);
 			break;
 		case WAIT_DIFS:
-			waitEventDFIS(&eventList, hosts, &simTime, &isUsed, &sensed, &wait);
+			change = true;
+			waitEventDFIS(&eventList, hosts, &simTime, &isUsed, &confs);
 			break;
 		case WAIT_SIFS:
-			waitEventSFIS(&eventList, hosts, &simTime, &isUsed, &sensed, &wait);
+			change = true;
+			waitEventSFIS(&eventList, hosts, &simTime, &isUsed, &confs);
 			break;
 		case BACKOFF:
 			break;
 		case UPDATE:
-			updateEvent(&eventList, &isUsed, &sensed, &simTime);
+			if (change == true){
+				updateEvent(&eventList, hosts, &isUsed, &simTime, &confs, &change);
+			}
+			else{
+				Event* e = eventList->remove();
+				delete e;
+				Event* updateEvent = new Event(eventList->first()->getTime() + SENSE, UPDATE, NUMHOSTS + 1);
+				eventList->insert(updateEvent);
+			}
+			i--;
 			break;
 		}
 		//cout << "TIME: " << simTime << endl;

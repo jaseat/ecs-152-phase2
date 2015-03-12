@@ -95,11 +95,14 @@ private:
 	int ackLength;
 	double totalDelay;
 	double startDelayTime;
-	int fail;
 public:
+	int fail;
 	int wait;
+	int waitAck;
 	bool recievedAck;
 	bool sent;
+	bool sensed;
+	bool departing;
 	Host() : Buffer(){
 		totalDelay = 0;
 	}
@@ -108,8 +111,11 @@ public:
 		fail = 1;
 		ackLength = 0;
 		wait = 0;
+		waitAck = 0;
 		recievedAck = true;
 		sent = false;
+		sensed = false;
+		departing = false;
 	}
 	void startDelay(double delay){
 		startDelayTime = delay;
@@ -124,15 +130,21 @@ public:
 		acks[ackLength] = p;
 		ackLength++;
 	}
-	int getFail(){
-		return fail;
+	Packet removeAck(){
+		Packet pckt = acks[0];
+		for (int i = 0; i < ackLength; i++){
+			acks[i] = acks[i + 1];
+		}
+		ackLength--;
+		return pckt;
 	}
-	void incFail(){
-		fail++;
+	Packet peekAck(){
+		if (ackLength < 1)
+			exit(1);
+		return acks[0];
 	}
-	void clearFail(){
-		fail = 1;
+	int getAckLength(){
+		return ackLength;
 	}
-
 };
 #endif
