@@ -14,9 +14,9 @@ void srand48(long time){
 #endif
 
 using namespace std;
-const double INTERARRIVALRATE = 10000;
+const double INTERARRIVALRATE = .01;
 const double TRANSMISSIONRATE = 1.0;
-const int NUMHOSTS = 2;
+const int NUMHOSTS = 10;
 const double MBPS = 11000000.0;
 const int MAXDATALENGTH = 1544;
 const int ACKLENGTH = 64;
@@ -88,7 +88,7 @@ void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool*
 	int length = generate_data_transmission_length();
 	Packet* pkt = new Packet(length, destination, false);
 	host->insert(*pkt);
-	//delete pkt;
+	delete pkt;
 
 	if (host->getLength() == 1){
 		host->startDelay(*time);
@@ -132,9 +132,8 @@ void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bo
 		Packet* nw = new Packet(ACKLENGTH, source, true);
 		host[destination]->insertAck(*nw);
 		host[destination]->startDelay(*time);
-		//delete nw;
-		if (host[destination]->getLength() == 0)
-			cout << "HEY LISTEN" << endl;
+		delete nw;
+
 		Event* waitSIFSEvent = new Event(SIFS + *time, WAIT_SIFS, destination);
 
 		(*gel)->insert(waitSIFSEvent);
@@ -241,7 +240,7 @@ int main(int argc, char* argv[])
 
 	Initiliaze(&eventList, &interArrivalRate, &throughput, &avgNetworkDelay, &simTime);
 
-	for (int i = 0; i < 100000; i++)
+	for (int i = 0; i < 10000000; i++)
 	{
 		Event* curEvent = eventList->first();
 		int source = curEvent->getSource();
