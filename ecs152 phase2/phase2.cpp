@@ -243,7 +243,6 @@ int main(int argc, char* argv[])
 
 	for (int i = 0; i < 100000; i++)
 	{
-		}
 		Event* curEvent = eventList->first();
 		int source = curEvent->getSource();
 		
