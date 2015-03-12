@@ -60,7 +60,7 @@ public:
 	}
 	Packet remove(){
 		Packet pckt;
-		if (length < 0)
+		if (length < 1)
 			exit(1);
 		else
 			pckt = buffer[0];

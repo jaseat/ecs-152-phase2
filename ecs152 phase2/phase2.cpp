@@ -14,9 +14,9 @@ void srand48(long time){
 #endif
 
 using namespace std;
-const double INTERARRIVALRATE = 0.90;
+const double INTERARRIVALRATE = 0.0001;
 const double TRANSMISSIONRATE = 1.0;
-const int NUMHOSTS = 10;
+const int NUMHOSTS = 20;
 const double MBPS = 11000000.0;
 const int MAXDATALENGTH = 1544;
 const int ACKLENGTH = 64;
@@ -40,10 +40,10 @@ double negative_exponenetially_distributed_time(double rate)
 
 //-------------------------------------------------------------------------------
 
-void Initiliaze(GEL **gel, double* interArrivalRate, double* throuput, double* avgNetworkDelay, double* time)
+void Initiliaze(GEL **gel, double* interArrivalRate, double* throughput, double* avgNetworkDelay, double* time)
 {
 	*interArrivalRate = INTERARRIVALRATE;
-	*throuput = 0;
+	*throughput = 0;
 	*avgNetworkDelay = 0;
 	*time = 0;
 
@@ -69,7 +69,8 @@ int generate_data_transmission_length()
 void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool* isUsed, double wait)
 {
 	int source;
-	int destination = rand() % NUMHOSTS;
+	int destination = (rand() % NUMHOSTS);
+	
 	double timeDiff = *time;
 	
 	Event* e = (*gel)->remove();
@@ -77,6 +78,9 @@ void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool*
 	timeDiff = *time - timeDiff;
 	source = e->getSource();
 	
+	while (source == destination){
+		destination = (rand() % NUMHOSTS);
+	}
 
 	Event* nextEvent = new Event(negative_exponenetially_distributed_time(arrivalRate) + *time, ARRIVAL, source);
 	(*gel)->insert(nextEvent);
@@ -86,9 +90,9 @@ void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool*
 	host->insert(*pkt);
 	delete pkt;
 
-	if (host->getLength == 0){
+	if (host->getLength() == 1){
 		host->startDelay(*time);
-		if (isUsed) {
+		if (*isUsed) {
 			double backoff = drand48() * randomBackOffMult;
 			Event* backoffEvent = new Event(backoff + *time + wait, BACKOFF, source);
 			(*gel)->insert(backoffEvent);
@@ -104,7 +108,7 @@ void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool*
 
 //-------------------------------------------------------------------------------
 
-void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bool* isUsed, double wait)
+void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bool* isUsed, double wait, double* throughput)
 {
 	int source;
 	int destination;
@@ -119,16 +123,24 @@ void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bo
 	host[source]->endDelay(*time);
 	Packet pckt = host[source]->remove();
 
-	destination = pckt.getDestination();
-	Packet* nw = new Packet(ACKLENGTH, source);
-	host[destination]->insertAck(*nw);
-	delete nw;
-	Event* waitSIFSEvent = new Event(SIFS + *time, WAIT_SIFS, destination);
+	*throughput = *throughput + pckt.getLength();
 
-	(*gel)->insert(waitSIFSEvent);
+	if (pckt.getLength() != ACKLENGTH){
+
+		destination = pckt.getDestination();
+
+		Packet* nw = new Packet(ACKLENGTH, source);
+		host[destination]->insertAck(*nw);
+		host[destination]->startDelay(*time);
+		delete nw;
+		Event* waitSIFSEvent = new Event(SIFS + *time, WAIT_SIFS, destination);
+
+		(*gel)->insert(waitSIFSEvent);
+	}
 	
 
-	if (host[source]->getLength > 0){
+	if (host[source]->getLength() > 0){
+		host[source]->startDelay(*time);
 		Event* waitDIFSEvent = new Event(DIFS + *time, WAIT_DIFS, source);
 		(*gel)->insert(waitDIFSEvent);
 	}
@@ -138,15 +150,61 @@ void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bo
 
 //-------------------------------------------------------------------------------
 
-void waitSIFSEvent(GEL** gel, Host** host, double arrivalRate, double *time, bool* isUsed, double* wait, double* throughput){
+void waitEvent(GEL** gel, Host** host, double *time, bool* isUsed, double* wait){
+	int source;
+	int destination;
+	double timeDiff = *time;
 
+	Event* e = (*gel)->remove();
+	*time = e->getTime();
+	timeDiff = *time - timeDiff;
+	source = e->getSource();
+
+	if (*isUsed){
+		double backoff = drand48() * randomBackOffMult;
+		Event* backoffEvent = new Event(backoff + *time + *wait, BACKOFF, source);
+		(*gel)->insert(backoffEvent);
+	}
+	else{
+		Packet pckt = host[source]->remove();
+		int length = pckt.getLength();
+		host[source]->insertAck(pckt);
+		double serviceTime = (length * 8) / MBPS;
+		*wait = serviceTime;
+		*isUsed = true;
+		Event* departureEvent = new Event(serviceTime + *time, DEPARTURE, source);
+		(*gel)->insert(departureEvent);
+	}
 }
 
 //-------------------------------------------------------------------------------
 
-void waitSIFSEvent(GEL** gel, Host** host, double arrivalRate, double *time, bool* isUsed, double* wait, double* throughput){
+/*void backoffEvent(GEL** gel, Host** host, double *time, bool* isUsed, double* wait){
+	int source;
+	int destination;
+	double timeDiff = *time;
 
-}
+	Event* e = (*gel)->remove();
+	*time = e->getTime();
+	timeDiff = *time - timeDiff;
+	source = e->getSource();
+
+	if (*isUsed){
+		double backoff = drand48() * randomBackOffMult;
+		Event* backoffEvent = new Event(backoff + *time + *wait, BACKOFF, source);
+		(*gel)->insert(backoffEvent);
+	}
+	else{
+		Packet pckt = host[source]->remove();
+		int length = pckt.getLength();
+		host[source]->insertAck(pckt);
+		double serviceTime = (length * 8) / MBPS;
+		*wait = serviceTime;
+		*isUsed = true;
+		Event* departureEvent = new Event(serviceTime + *time, DEPARTURE, source);
+		(*gel)->insert(departureEvent);
+	}
+}*/
 
 //-------------------------------------------------------------------------------
 
@@ -179,28 +237,46 @@ int main(int argc, char* argv[])
 	//Keeps track of the total time;
 	double simTime;
 
-	Initialize(&eventList, &queue, buffersize, &interArrivalRate, &transmissionRate, 
-		&utilization, &meanQueueLength, &packetsDropped, &simTime);
+	Initiliaze(&eventList, &interArrivalRate, &throughput, &avgNetworkDelay, &simTime);
 
 	for (int i = 0; i < 100000; i++)
 	{
-		if (eventList->first()->getType() == ARRIVAL) 
-			arrivalEvent(&eventList, &queue, interArrivalRate, transmissionRate, &utilization, 
-			&meanQueueLength, &packetsDropped, &simTime);
-		else
-			departureEvent(&eventList, &queue, interArrivalRate, transmissionRate, 
-			&utilization, &meanQueueLength, &simTime);
+		/*cout << "I: " << i << endl;
+		for (int i = 0; i < NUMHOSTS; i++){
+			cout << "Host " << i << " length: " << hosts[i]->getLength() << endl;
+		}*/
+		Event* curEvent = eventList->first();
+		int source = curEvent->getSource();
+		//cout << "Current Host: " << source << endl;
+		switch (curEvent->getType())
+		{
+		case ARRIVAL:
+			arrivalEvent(&eventList, hosts[source], interArrivalRate, &simTime, &isUsed, wait);
+			break;
+		case DEPARTURE:
+			departureEvent(&eventList, hosts, interArrivalRate, &simTime, &isUsed, wait, &throughput);
+			break;
+		case WAIT_DIFS:
+		case WAIT_SIFS:
+		case BACKOFF:
+			waitEvent(&eventList, hosts, &simTime, &isUsed, &wait);
+			break;
+		}
 		//cout << "TIME: " << simTime << endl;
 	}
 
 	simTime = simTime / 1000;
 
-	utilization = utilization / simTime;
-	meanQueueLength = meanQueueLength / simTime;
+	throughput = throughput / simTime;
+	for (int i = 0; i < NUMHOSTS; i++){
+		avgNetworkDelay = avgNetworkDelay + hosts[i]->getTotalDeay();
+	}
+	avgNetworkDelay = avgNetworkDelay / 1000;
+	avgNetworkDelay = avgNetworkDelay / throughput;
 	
-	cout << "Mean queue length: " << meanQueueLength << endl;
-	cout << "Server utilization: " << utilization << endl;
-	cout << "Packets dropped: " << packetsDropped << endl;
+	cout << "Throughput: " << throughput << endl;
+	cout << "Average Network Delay: " << avgNetworkDelay << endl;
+	cout << "Simulation Time: " << simTime << endl;
 	getchar();
 
 }

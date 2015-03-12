@@ -67,15 +67,18 @@ public:
 	//inserts events by order of time
 	void insert(Event* e){
 		Event* cur = head;
-		if (head == nullptr)
+		if (head == nullptr){
 			head = e;
+			return;
+		}
 		else{
 			if (cur->getTime() > e->getTime()){
 				e->setNext(cur);
 				cur->setPrevious(e);
 				head = e;
+				return;
 			}
-			while (e->getTime() > cur->getTime()){
+			while (e->getTime() >= cur->getTime()){
 				if (cur->getNext() == nullptr){
 					cur->setNext(e);
 					e->setPrevious(cur);
@@ -85,6 +88,8 @@ public:
 				cur = cur->getNext();
 			}
 			Event* s = cur;
+			if (cur->getPrevious() == nullptr)
+				std::cout << "HEY LISTEN!";
 			cur = cur->getPrevious();
 			cur->setNext(e);
 			e->setNext(s);
