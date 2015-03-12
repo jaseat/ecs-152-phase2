@@ -121,6 +121,8 @@ public:
 		startDelayTime = delay;
 	}
 	void endDelay(double delay){
+		//if (delay - startDelayTime > 100)
+			//std::cout << "Woah" << std::endl;
 		totalDelay = totalDelay + (delay - startDelayTime);
 	}
 	double getTotalDeay(){
