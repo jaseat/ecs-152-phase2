@@ -3,7 +3,7 @@
 //For types of events: Arrival, departue, backoff, and wait. For backoff the events are cleared when
 //the channel becomes busy and reentered when the channel is clear. When the events are cleared the
 //hosts should update their wait time
-enum EventType { ARRIVAL, DEPARTURE, BACKOFF, WAIT_DIFS, WAIT_SIFS };
+enum EventType { ARRIVAL, DEPARTURE, DEPARTURE_ACK, BACKOFF, WAIT_DIFS, WAIT_SIFS, UPDATE };
 
 
 //Event class: Includes time of the event and type of the event and pointers to next and previous event
@@ -112,46 +112,31 @@ public:
 	Event* first(){
 		return head;
 	}
-	//Removes all events of type Backoff from the event list
-	void pauseBackoff(double wait){
-		if (head == nullptr)
-			return;
-		Event* e = head;
-		GEL* temp = new GEL;
-		while (head->getType() == BACKOFF){
-			if (head->getNext() != nullptr){
-				head = e->getNext();
-				head->setPrevious(nullptr);
-				e->setTime(e->getTime() + wait);
-				temp->insert(e);
-				e = head;
-			}
+	//Removes all events from a certain host
+	void removeHost(int hostNum){
+		while (head->getSource() == hostNum){
+			Event* h = head;
+			head = head->getNext();
+			head->setPrevious(nullptr);
+			delete h;
 		}
-		while (e->getNext() != nullptr)
-		{
-			if (e->getType() == BACKOFF){
-				Event* prev = e->getPrevious();
-				Event* next = e->getNext();
+		Event* cur = head;
+		while (cur->getNext != nullptr){
+			if (cur->getSource() == hostNum){
+				Event* e = cur;
+				Event* prev = cur->getPrevious();
+				Event* next = cur->getNext();
 				prev->setNext(next);
 				next->setPrevious(prev);
-				e->setTime(e->getTime() + wait);
-				temp->insert(e);
-				e = next;
-
+				cur = next;
+				delete e;
 			}
 		}
-		if (e->getType() == BACKOFF){
-			Event* prev = e->getPrevious();
+		if (cur->getSource == hostNum){
+			Event* prev = cur->getPrevious();
 			prev->setNext(nullptr);
-			e->setTime(e->getTime() + wait);
-			temp->insert(e);
+			delete cur;
 		}
-		e = temp->remove();
-		while (e != nullptr){
-			this->insert(e);
-			e = temp->remove();
-		}
-		
 	}
 };
 #endif

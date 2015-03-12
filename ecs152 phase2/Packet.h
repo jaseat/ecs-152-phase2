@@ -91,14 +91,25 @@ public:
 
 class Host : public Buffer{
 private:
+	Packet acks[256];
+	int ackLength;
 	double totalDelay;
 	double startDelayTime;
+	int fail;
 public:
+	int wait;
+	bool recievedAck;
+	bool sent;
 	Host() : Buffer(){
 		totalDelay = 0;
 	}
 	Host(int buffersize) : Buffer(buffersize){
 		totalDelay = 0;
+		fail = 1;
+		ackLength = 0;
+		wait = 0;
+		recievedAck = true;
+		sent = false;
 	}
 	void startDelay(double delay){
 		startDelayTime = delay;
@@ -110,11 +121,17 @@ public:
 		return totalDelay;
 	}
 	void insertAck(Packet p){
-		for (int i = 0; i < length; i++){
-			buffer[length - i] = buffer[length - (i + 1)];
-		}
-		buffer[0] = p;
-		length++;
+		acks[ackLength] = p;
+		ackLength++;
+	}
+	int getFail(){
+		return fail;
+	}
+	void incFail(){
+		fail++;
+	}
+	void clearFail(){
+		fail = 1;
 	}
 
 };
