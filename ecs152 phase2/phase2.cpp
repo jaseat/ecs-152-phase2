@@ -14,9 +14,9 @@ void srand48(long time){
 #endif
 
 using namespace std;
-const double INTERARRIVALRATE = 0.0001;
+const double INTERARRIVALRATE = 10000;
 const double TRANSMISSIONRATE = 1.0;
-const int NUMHOSTS = 20;
+const int NUMHOSTS = 2;
 const double MBPS = 11000000.0;
 const int MAXDATALENGTH = 1544;
 const int ACKLENGTH = 64;
@@ -86,9 +86,9 @@ void arrivalEvent(GEL** gel, Host* host, double arrivalRate, double *time, bool*
 	(*gel)->insert(nextEvent);
 
 	int length = generate_data_transmission_length();
-	Packet* pkt = new Packet(length, destination);
+	Packet* pkt = new Packet(length, destination, false);
 	host->insert(*pkt);
-	delete pkt;
+	//delete pkt;
 
 	if (host->getLength() == 1){
 		host->startDelay(*time);
@@ -125,25 +125,28 @@ void departureEvent(GEL** gel, Host** host, double arrivalRate, double *time, bo
 
 	*throughput = *throughput + pckt.getLength();
 
-	if (pckt.getLength() != ACKLENGTH){
+	if (!(pckt.isAck())){
 
 		destination = pckt.getDestination();
 
-		Packet* nw = new Packet(ACKLENGTH, source);
+		Packet* nw = new Packet(ACKLENGTH, source, true);
 		host[destination]->insertAck(*nw);
 		host[destination]->startDelay(*time);
-		delete nw;
+		//delete nw;
+		if (host[destination]->getLength() == 0)
+			cout << "HEY LISTEN" << endl;
 		Event* waitSIFSEvent = new Event(SIFS + *time, WAIT_SIFS, destination);
 
 		(*gel)->insert(waitSIFSEvent);
+		if (host[source]->getLength() > 0){
+			host[source]->startDelay(*time);
+			Event* waitDIFSEvent = new Event(DIFS + *time, WAIT_DIFS, source);
+			(*gel)->insert(waitDIFSEvent);
+		}
 	}
 	
 
-	if (host[source]->getLength() > 0){
-		host[source]->startDelay(*time);
-		Event* waitDIFSEvent = new Event(DIFS + *time, WAIT_DIFS, source);
-		(*gel)->insert(waitDIFSEvent);
-	}
+	
 
 	delete e;
 }
@@ -166,9 +169,8 @@ void waitEvent(GEL** gel, Host** host, double *time, bool* isUsed, double* wait)
 		(*gel)->insert(backoffEvent);
 	}
 	else{
-		Packet pckt = host[source]->remove();
+		Packet pckt = host[source]->peek();
 		int length = pckt.getLength();
-		host[source]->insertAck(pckt);
 		double serviceTime = (length * 8) / MBPS;
 		*wait = serviceTime;
 		*isUsed = true;
@@ -241,13 +243,10 @@ int main(int argc, char* argv[])
 
 	for (int i = 0; i < 100000; i++)
 	{
-		/*cout << "I: " << i << endl;
-		for (int i = 0; i < NUMHOSTS; i++){
-			cout << "Host " << i << " length: " << hosts[i]->getLength() << endl;
-		}*/
+		}
 		Event* curEvent = eventList->first();
 		int source = curEvent->getSource();
-		//cout << "Current Host: " << source << endl;
+		
 		switch (curEvent->getType())
 		{
 		case ARRIVAL:
@@ -257,7 +256,11 @@ int main(int argc, char* argv[])
 			departureEvent(&eventList, hosts, interArrivalRate, &simTime, &isUsed, wait, &throughput);
 			break;
 		case WAIT_DIFS:
+			waitEvent(&eventList, hosts, &simTime, &isUsed, &wait);
+			break;
 		case WAIT_SIFS:
+			waitEvent(&eventList, hosts, &simTime, &isUsed, &wait);
+			break;
 		case BACKOFF:
 			waitEvent(&eventList, hosts, &simTime, &isUsed, &wait);
 			break;

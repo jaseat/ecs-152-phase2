@@ -1,19 +1,22 @@
 #ifndef PACKET_H
 #define PACKET_H
-const int MAXBUFFER = 100;
+const int MAXBUFFER = 10000;
 
 //Packet class: includes service time for each packet and a pointer to the next packet
 class Packet{
 private:
 	int length;
 	int destination;
+	bool ack;
 public:
 	Packet(){
 		//nothing
+		length = 666;
 	}
-	Packet(int length, int destination){
+	Packet(int length, int destination, bool ack){
 		this->length = length;
 		this->destination = destination;
+		this->ack = ack;
 	}
 	int getLength(){
 		return length;
@@ -23,6 +26,9 @@ public:
 	}
 	int getDestination(){
 		return destination;
+	}
+	bool isAck(){
+		return ack;
 	}
 
 };
@@ -69,6 +75,11 @@ public:
 		}
 		length--;
 		return pckt;
+	}
+	Packet peek(){
+		if (length < 1)
+			exit(1);
+		return buffer[0];
 	}
 	int getLength(){
 		return length;
