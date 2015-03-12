@@ -5,27 +5,31 @@ const int MAXBUFFER = 100;
 //Packet class: includes service time for each packet and a pointer to the next packet
 class Packet{
 private:
-	double serviceTime;
+	int length;
 	int destination;
 public:
 	Packet(){
 		//nothing
 	}
-	Packet(double time, int destination){
-		serviceTime = time;
+	Packet(int length, int destination){
+		this->length = length;
 		this->destination = destination;
 	}
-	double getServiceTime(){
-		return serviceTime;
+	int getLength(){
+		return length;
 	}
-	void setSeviceTime(double time){
-		serviceTime = time;
+	void setLength(int length){
+		this->length = length;
 	}
+	int getDestination(){
+		return destination;
+	}
+
 };
 
 //Buffer class: holds a list of all packets to be serviced
 class Buffer{
-private:
+protected:
 	Packet* buffer;
 	int maxSize;
 	int length;
@@ -74,21 +78,32 @@ public:
 	}
 };
 
-class Host : private Buffer{
+class Host : public Buffer{
 private:
-	double backoffTime;
+	double totalDelay;
+	double startDelayTime;
 public:
 	Host() : Buffer(){
-		backoffTime = 0;
+		totalDelay = 0;
 	}
 	Host(int buffersize) : Buffer(buffersize){
-		backoffTime = 0;
+		totalDelay = 0;
 	}
-	double getBackoffTime(){
-		return backoffTime;
+	void startDelay(double delay){
+		startDelayTime = delay;
 	}
-	void setBackoffTime(double time){
-		backoffTime = time;
+	void endDelay(double delay){
+		totalDelay = totalDelay + (delay - startDelayTime);
+	}
+	double getTotalDeay(){
+		return totalDelay;
+	}
+	void insertAck(Packet p){
+		for (int i = 0; i < length; i++){
+			buffer[length - i] = buffer[length - (i + 1)];
+		}
+		buffer[0] = p;
+		length++;
 	}
 
 };

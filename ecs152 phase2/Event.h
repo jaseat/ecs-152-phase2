@@ -15,30 +15,28 @@ private:
 	Event* next;
 	Event* previous;
 	int source;
-	int destination;
 public:
 	Event(){
 		//nothing
 	}
-	Event(double time, EventType type, int source, int destination){
+	Event(double time, EventType type, int source){
 		eventTime = time;
 		this->type = type;
 		this->source = source;
-		this->destination = destination;
 		next = nullptr;
 		previous = nullptr;
 	}
 	double getTime(){
 		return eventTime;
 	}
+	void setTime(double time){
+		eventTime = time;
+	}
 	EventType getType(){
 		return type;
 	}
 	int getSource(){
 		return source;
-	}
-	int getDestination(){
-		return destination;
 	}
 	void setNext(Event* next){
 		this->next = next;
@@ -110,15 +108,17 @@ public:
 		return head;
 	}
 	//Removes all events of type Backoff from the event list
-	void clearBackoff(){
+	void pauseBackoff(double wait){
 		if (head == nullptr)
 			return;
 		Event* e = head;
+		GEL* temp = new GEL;
 		while (head->getType() == BACKOFF){
 			if (head->getNext() != nullptr){
 				head = e->getNext();
 				head->setPrevious(nullptr);
-				delete e;
+				e->setTime(e->getTime() + wait);
+				temp->insert(e);
 				e = head;
 			}
 		}
@@ -129,7 +129,8 @@ public:
 				Event* next = e->getNext();
 				prev->setNext(next);
 				next->setPrevious(prev);
-				delete e;
+				e->setTime(e->getTime() + wait);
+				temp->insert(e);
 				e = next;
 
 			}
@@ -137,8 +138,15 @@ public:
 		if (e->getType() == BACKOFF){
 			Event* prev = e->getPrevious();
 			prev->setNext(nullptr);
-			delete e;
+			e->setTime(e->getTime() + wait);
+			temp->insert(e);
 		}
+		e = temp->remove();
+		while (e != nullptr){
+			this->insert(e);
+			e = temp->remove();
+		}
+		
 	}
 };
 #endif
